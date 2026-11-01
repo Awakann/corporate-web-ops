@@ -7,12 +7,51 @@ const bcrypt = require("bcryptjs");
 const session = require("express-session");
 const { MongoStore } = require("connect-mongo");
 
+const { rateLimit } = require("express-rate-limit");
+
 const app = express();
+
+const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? "0");
+
+if (!Number.isInteger(proxyHops) || proxyHops < 0) {
+  throw new Error("TRUST_PROXY_HOPS must be a non-negative integer");
+}
+
+app.set("trust proxy", proxyHops);
+
+const allowedOrigins = new Set(
+  (process.env.APP_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean)
+);
+
+if (allowedOrigins.size === 0) {
+  throw new Error("APP_ORIGINS is required");
+}
+
+app.use("/api", (req, res, next) => {
+  if (["GET", "HEAD", "OPTIONS"].includes(req.method)) {
+    return next();
+  }
+
+  const origin = req.get("Origin");
+
+  if (!origin || !allowedOrigins.has(origin)) {
+    return res.status(403).json({
+      error: "Request origin is not allowed",
+    });
+  }
+
+  return next();
+});
+
 app.use(express.json());
 
 if (!process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET is required");
 }
+
 
 app.use(
     session({
@@ -31,6 +70,16 @@ app.use(
 );
 
 
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  skipSuccessfulRequests: true,
+  message: {
+    error: "Too many failed login attempts. Try again in 15 minutes.",
+  },
+});
 
 
 app.get("/api/health", (req, res) => {
@@ -161,7 +210,7 @@ app.post("/api/pages", async (req, res) => {
 });
 
 
-app.post("/api/auth/login", async (req, res) => {
+app.post("/api/auth/login", loginLimiter, async (req, res) => {
     const { email, password } = req.body ?? {};
 
     if (typeof email !== "string" || typeof password !== "string") {

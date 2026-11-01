@@ -11,6 +11,8 @@ A full-stack content management application with authenticated staff access, dra
 - Public pages with individual URL slugs.
 - Responsive green interface.
 - Docker Compose setup for the complete application.
+- Login throttling for repeated failed attempts.
+- Origin validation for state-changing API requests.
 
 ## Technology
 
@@ -132,4 +134,4 @@ corporate-web-ops/
 
 ## Current Status
 
-The application runs locally with Docker. Frontend build and lint checks pass. Cloud deployment and automated CI checks are the next milestones.
+The application runs locally with Docker. GitHub Actions checks frontend linting and builds, Docker startup, public endpoints, and request-origin protection. Cloud deployment is the next milestone.

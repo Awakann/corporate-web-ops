@@ -52,6 +52,32 @@ jobs:
           curl --fail --silent --show-error http://localhost:8080/api/pages
           curl --fail --silent --show-error --output /dev/null http://localhost:8080/site
 
+      - name: Check request-origin protection
+        run: |
+          body='{"email":"origin-test@example.invalid","password":"incorrect-test-password"}'
+
+          check_origin() {
+            local label="$1"
+            local expected="$2"
+            local actual
+            shift 2
+
+            actual=$(curl --silent --show-error --max-time 10 \
+              --output /dev/null --write-out "%{http_code}" \
+              --request POST \
+              --header "Content-Type: application/json" \
+              --data "$body" \
+              "$@" \
+              http://localhost:8080/api/auth/login)
+
+            echo "$label: $actual"
+            test "$actual" = "$expected"
+          }
+
+          check_origin "Missing origin" 403
+          check_origin "Untrusted origin" 403 --header "Origin: https://untrusted.example"
+          check_origin "Allowed origin" 401 --header "Origin: http://localhost:8080"
+
       - name: Show container logs on failure
         if: failure()
         run: docker compose logs --no-color --tail 100
