@@ -1,0 +1,61 @@
+name: CMS checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: client
+        run: npm ci
+
+      - name: Check frontend code
+        working-directory: client
+        run: npm run lint
+
+      - name: Build frontend
+        working-directory: client
+        run: npm run build
+
+      - name: Create temporary CI environment
+        run: |
+          node -e "require('node:fs').writeFileSync('server/.env', 'SESSION_SECRET=' + require('node:crypto').randomBytes(32).toString('hex') + '\n')"
+
+      - name: Build and start containers
+        run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Check API through Nginx
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-connrefused --retry-delay 2 --max-time 10 http://localhost:8080/api/health
+
+      - name: Check public endpoints
+        run: |
+          curl --fail --silent --show-error http://localhost:8080/api/pages
+          curl --fail --silent --show-error --output /dev/null http://localhost:8080/site
+
+      - name: Show container logs on failure
+        if: failure()
+        run: docker compose logs --no-color --tail 100
+
+      - name: Stop containers
+        if: always()
+        run: docker compose down
