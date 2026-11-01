@@ -1,7 +1,7 @@
 
 const express = require("express");
 const mongoose = require("mongoose");
-const Page = require("./models/page");
+const Page = require("./models/Page");
 const User = require("./models/User");
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
