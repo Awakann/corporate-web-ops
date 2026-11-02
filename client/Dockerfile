@@ -8,7 +8,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM nginx/nginx-unprivileged:stable-alpine
+FROM ghcr.io/nginx/nginx-unprivileged:stable-alpine
 
 ARG NGINX_CONFIG=nginx.conf
 
