@@ -1,22 +1,55 @@
 # Corporate Web Ops & CMS
 
-A full-stack content management application with authenticated staff access, draft editing, role-based publishing, and public pages.
+A full-stack content management system deployed on Azure, with authenticated staff access, role-based publishing, and public pages.
+
+Built to demonstrate web development, containerization, cloud deployment, and operational troubleshooting.
+
+## Live Application
+
+- [Public website](https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io/site)
+- [Staff portal](https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io/)
+- [API health](https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io/api/health)
+
+Staff access requires an account. No public admin credentials are provided.
+
+**Demo availability:** Atlas network access is currently temporary. When its access-list entry expires, database-backed features become unavailable. With scaling to zero enabled, the first request after inactivity may take longer.
+
+## Screenshots
+
+### Staff Dashboard
+
+![Staff dashboard](docs/images/dashboard.png)
+
+### Published Page
+
+![Published page](docs/images/published-page.png)
+
+### GitHub Actions
+
+![Successful CI checks](docs/images/github-actions.png)
 
 ## Features
 
-- Session-based login and logout.
-- Session restoration after refreshing.
+- Session-based authentication with login, logout, and session restoration.
 - Draft creation and content editing.
-- Publishing confirmation.
+- Role-based publishing with confirmation.
 - Public pages with individual URL slugs.
-- Responsive green interface.
-- Docker Compose setup for the complete application.
-- Login throttling for repeated failed attempts.
-- Origin validation for state-changing API requests.
+- Responsive React interface.
+- Login throttling and origin validation for state-changing requests.
+- Local Docker Compose environment.
+- Azure deployment with managed identity and application secrets.
 
 ## Technology
 
-React, Vite, React Router, Node.js, Express, MongoDB, Mongoose, Nginx, and Docker Compose.
+| Area | Tools |
+| --- | --- |
+| Frontend | React, Vite, React Router |
+| Backend | Node.js, Express, Mongoose |
+| Database | MongoDB, MongoDB Atlas |
+| Containers | Docker, Docker Compose |
+| Web server | Nginx |
+| Cloud | Azure Container Apps, Azure Container Registry |
+| CI | GitHub Actions |
 
 ## Roles
 
@@ -31,49 +64,58 @@ Permissions are enforced by the API.
 
 ## Architecture
 
-- Nginx serves the compiled React application.
-- Requests beginning with `/api` are forwarded to Express.
+### Local Development
+
+- Nginx serves the compiled React application and forwards `/api` requests to Express.
+- Docker Compose runs Nginx, Express, and MongoDB.
 - MongoDB stores users, pages, and sessions.
-- A named Docker volume preserves database data.
+- A named Docker volume preserves local database data.
 - Health checks control service startup order.
 
-## Requirements
+### Azure Deployment
+
+- Azure Container Registry stores versioned frontend and API images.
+- Azure Container Apps runs Nginx and Express as two containers in one app.
+- HTTPS ingress forwards requests to Nginx on port 8080.
+- Nginx forwards `/api` requests to Express through localhost on port 5000.
+- MongoDB Atlas stores application data and sessions.
+- A user-assigned managed identity has registry-scoped `AcrPull` access.
+- The database URI and session secret are stored as Container Apps secrets.
+- The deployment configuration limits scaling to one replica and supports scaling to zero.
+
+## Run Locally
+
+### Requirements
 
 - Docker Desktop with Docker Compose.
 - Node.js 24 and npm for development outside Docker.
 
-## Run with Docker
-
-For a fresh checkout, create the environment file:
+From a fresh checkout, create the environment file:
 
 ```powershell
 Copy-Item server/.env.example server/.env
 ```
 
-Replace the `SESSION_SECRET` placeholder in `server/.env` with a unique random value. Keep this file private.
+Replace the `SESSION_SECRET` placeholder with a unique random value. Keep the environment file private.
 
-From the project root:
+Start the application:
 
 ```powershell
 docker compose up -d --build
 docker compose ps
 ```
 
-Open:
-
 | Address | Purpose |
 | --- | --- |
 | http://localhost:8080 | Staff portal |
-| http://localhost:8080/site | Published pages |
-| http://localhost:8080/api/health | API health check |
+| http://localhost:8080/site | Public website |
+| http://localhost:8080/api/health | API health |
 
-This Compose configuration runs locally over HTTP. Production deployment requires HTTPS and production session settings.
+Local Compose uses HTTP and development session settings. Azure uses HTTPS and production session settings.
 
-## Create the First Admin
+## Create the First Local Admin
 
-The application has no default password.
-
-In PowerShell, set temporary credentials and run the seed script:
+There is no default password. Run in PowerShell:
 
 ```powershell
 $env:ADMIN_EMAIL = Read-Host "Admin email"
@@ -88,50 +130,103 @@ Remove-Variable adminSecure
 
 The seed script creates the initial admin only if one does not already exist.
 
-## Development
+Local MongoDB and cloud Atlas are separate databases. Accounts created locally are not automatically available in Azure.
 
-For frontend setup and commands, see [client/README.md](client/README.md).
+## Azure Configuration
 
-## Quality Checks
+`containerapp.azure.yaml` defines the web and API containers, environment variables, health probes, and replica limits.
 
-From `client`:
+It references two existing secrets:
+
+| Secret | API environment variable |
+| --- | --- |
+| `mongodb-uri` | `MONGODB_URI` |
+| `session-secret` | `SESSION_SECRET` |
+
+To update the existing Azure app:
 
 ```powershell
-npm ci
-npm run lint
-npm run build
+az containerapp update --name ca-corporate-web-ops --resource-group rg-corporate-web-ops --yaml containerapp.azure.yaml
 ```
 
-## Useful Docker Commands
+This command requires the existing environment, registry access, identity, and application secrets. The YAML is an application update configuration, not a complete infrastructure provisioning template.
 
-View application logs:
+## Verification
+
+### Automated CI Checks
+
+GitHub Actions checks:
+
+- Frontend linting and production build.
+- Local Docker image builds and service startup.
+- API health through Nginx.
+- Public API and website responses.
+- Origin validation for state-changing requests.
+
+### Manual Azure Verification
+
+Verified after deployment:
+
+- Login and session persistence after refresh.
+- Draft creation and editing.
+- Publishing and public-page visibility.
+- Logout.
+- API health and database reads.
+
+Deployment is currently performed manually. Automated cloud deployment and comprehensive API tests are planned.
+
+## Troubleshooting Experience
+
+| Issue | Diagnosis and resolution |
+| --- | --- |
+| API failed inside Linux container | Corrected model import filename casing |
+| Image downloads and Azure commands failed | Investigated DNS resolution and network connectivity |
+| Public endpoint returned 502 | Inspected API startup logs behind Nginx |
+| MongoDB rejected the URI | Corrected the saved connection-string format |
+| Atlas authentication failed | Corrected database credentials and restarted the revision |
+| Local network blocked verification | Used Azure Cloud Shell to test independently |
+
+## Useful Commands
+
+View local logs:
 
 ```powershell
 docker compose logs --tail 80 api web
 ```
 
-Rebuild after changing application code:
+Rebuild local services:
 
 ```powershell
 docker compose up -d --build
 ```
 
-Stop the application while preserving database data:
+Stop local services while preserving database data:
 
 ```powershell
 docker compose down
 ```
 
-## Project Structure
+View cloud API logs:
 
-```text
-corporate-web-ops/
-├── client/             React frontend and Nginx configuration
-├── server/             Express API, models, and account scripts
-├── compose.yaml        Container orchestration
-└── README.md
+```powershell
+az containerapp logs show --name ca-corporate-web-ops --resource-group rg-corporate-web-ops --container api --type console --tail 50
 ```
 
-## Current Status
+Cloud console logs require an available replica.
 
-The application runs locally with Docker. GitHub Actions checks frontend linting and builds, Docker startup, public endpoints, and request-origin protection. Cloud deployment is the next milestone.
+## Project Structure
+
+- `client/` — React frontend, Dockerfile, and Nginx configurations.
+- `server/` — Express API, models, Dockerfile, and account scripts.
+- `.github/workflows/ci.yml` — Automated CI checks.
+- `compose.yaml` — Local container orchestration.
+- `containerapp.azure.yaml` — Azure application update configuration.
+
+For frontend development instructions, see [client/README.md](client/README.md).
+
+## Planned Improvements
+
+- Automated Azure deployment using GitHub Actions and OIDC.
+- API tests for authentication, permissions, and publishing.
+- Infrastructure provisioning with Bicep or Terraform.
+- Monitoring, cost alerts, and a durable database network-access setup.
