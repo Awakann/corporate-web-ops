@@ -1,0 +1,46 @@
+properties:
+  template:
+    containers:
+      - name: web
+        image: acrcorporateopsawakann.azurecr.io/cms-web:83060af
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+
+      - name: api
+        image: acrcorporateopsawakann.azurecr.io/cms-api:37626eb
+        resources:
+          cpu: 0.25
+          memory: 0.5Gi
+        env:
+          - name: PORT
+            value: "5000"
+          - name: NODE_ENV
+            value: production
+          - name: TRUST_PROXY_HOPS
+            value: "2"
+          - name: APP_ORIGINS
+            value: https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io
+          - name: MONGODB_URI
+            secretRef: mongodb-uri
+          - name: SESSION_SECRET
+            secretRef: session-secret
+        probes:
+          - type: Startup
+            httpGet:
+              path: /api/health
+              port: 5000
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 30
+          - type: Readiness
+            httpGet:
+              path: /api/health
+              port: 5000
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+
+    scale:
+      minReplicas: 0
+      maxReplicas: 1
