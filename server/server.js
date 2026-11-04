@@ -53,11 +53,18 @@ if (!process.env.SESSION_SECRET) {
 }
 
 
+
+const sessionStore = MongoStore.create({
+  mongoUrl: process.env.MONGODB_URI,
+});
+
+
+
 app.use(
     session({
         name: "corporate.sid",
         secret: process.env.SESSION_SECRET,
-        store:  MongoStore.create({ mongoUrl: process.env.MONGODB_URI }),
+        store:  sessionStore,
         resave: false,
         saveUninitialized: false,
         cookie: {
@@ -68,6 +75,7 @@ app.use(
         },
     })
 );
+
 
 
 const loginLimiter = rateLimit({
@@ -287,7 +295,7 @@ app.patch("/api/admin/pages/:id/publish", async (req, res) => {
     const page = await Page.findOneAndUpdate(
       { _id: req.params.id, status: "draft" },
       { $set: { status: "published" } },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!page) {
@@ -329,7 +337,7 @@ app.patch("/api/admin/pages/:id", async (req, res) => {
     const page = await Page.findOneAndUpdate(
       { _id: req.params.id, status: "draft" },
       { $set: { content: content.trim() } },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!page) {
@@ -362,7 +370,11 @@ async function startServer() {
     }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = { app, sessionStore };
 
 
 
