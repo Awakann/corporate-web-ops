@@ -173,7 +173,7 @@ Verified after deployment:
 - Logout.
 - API health and database reads.
 
-Deployment is currently performed manually. Automated cloud deployment and comprehensive API tests are planned.
+GitHub Actions automatically deploys commits on main after verification passes. Deployment uses Azure OIDC authentication, commit-tagged container images, revision-readiness checks, and deployed endpoint checks. Comprehensive API tests are planned.
 
 ## Troubleshooting Experience
 
@@ -226,7 +226,6 @@ For frontend development instructions, see [client/README.md](client/README.md).
 
 ## Planned Improvements
 
-- Automated Azure deployment using GitHub Actions and OIDC.
 - API tests for authentication, permissions, and publishing.
 - Infrastructure provisioning with Bicep or Terraform.
 - Monitoring, cost alerts, and a durable database network-access setup.
