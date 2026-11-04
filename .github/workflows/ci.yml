@@ -85,3 +85,129 @@ jobs:
       - name: Stop containers
         if: always()
         run: docker compose down
+
+  deploy:
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+
+    environment:
+      name: production
+      url: https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io
+
+    concurrency:
+      group: cms-production
+      cancel-in-progress: false
+
+    permissions:
+      contents: read
+      id-token: write
+
+    env:
+      ACR_NAME: ${{ vars.AZURE_ACR_NAME }}
+      ACR_SERVER: ${{ vars.AZURE_ACR_LOGIN_SERVER }}
+      RESOURCE_GROUP: ${{ vars.AZURE_RESOURCE_GROUP }}
+      CONTAINER_APP: ${{ vars.AZURE_CONTAINER_APP }}
+      AZURE_CORE_OUTPUT: none
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Sign in to Azure using OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sign in to container registry
+        run: az acr login --name "$ACR_NAME"
+
+      - name: Build and push API image
+        run: |
+          docker build --platform linux/amd64 \
+            --tag "$ACR_SERVER/cms-api:$GITHUB_SHA" ./server
+          docker push "$ACR_SERVER/cms-api:$GITHUB_SHA"
+
+      - name: Build and push web image
+        run: |
+          docker build --platform linux/amd64 \
+            --build-arg NGINX_CONFIG=nginx.azure.conf \
+            --tag "$ACR_SERVER/cms-web:$GITHUB_SHA" ./client
+          docker push "$ACR_SERVER/cms-web:$GITHUB_SHA"
+
+      - name: Prepare deployment configuration
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+
+          config = Path("containerapp.azure.yaml").read_text()
+          registry = os.environ["ACR_SERVER"]
+          tag = os.environ["GITHUB_SHA"]
+
+          for image in ("cms-api", "cms-web"):
+              pattern = rf"(?m)^(\s*image:\s*)\S+/{image}:\S+\s*$"
+              replacement = rf"\g<1>{registry}/{image}:{tag}"
+              config, count = re.subn(pattern, replacement, config)
+              if count != 1:
+                  raise SystemExit(f"Expected exactly one {image} image entry")
+
+          target = Path(os.environ["RUNNER_TEMP"]) / "cms-deploy.yaml"
+          target.write_text(config)
+          PY
+
+      - name: Deploy both containers
+        run: |
+          az containerapp revision set-mode \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --mode single
+
+          az containerapp update \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --yaml "$RUNNER_TEMP/cms-deploy.yaml"
+
+      - name: Wait for the new revision
+        run: |
+          expected=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.latestRevisionName --output tsv)
+
+          for attempt in {1..30}; do
+            ready=$(az containerapp show \
+              --name "$CONTAINER_APP" \
+              --resource-group "$RESOURCE_GROUP" \
+              --query properties.latestReadyRevisionName --output tsv)
+
+            if [ "$ready" = "$expected" ]; then
+              echo "Revision ready: $ready"
+              exit 0
+            fi
+
+            echo "Waiting for $expected ($attempt/30)"
+            sleep 10
+          done
+
+          echo "Deployment did not become ready within five minutes"
+          exit 1
+
+      - name: Check deployed endpoints
+        run: |
+          hostname=$(az containerapp show \
+            --name "$CONTAINER_APP" \
+            --resource-group "$RESOURCE_GROUP" \
+            --query properties.configuration.ingress.fqdn --output tsv)
+
+          for path in /api/health /api/pages /site; do
+            curl --fail --silent --show-error \
+              --retry 5 --retry-all-errors --retry-delay 5 \
+              --connect-timeout 15 --max-time 90 \
+              --output /dev/null "https://$hostname$path"
+            echo "Passed: $path"
+          done
