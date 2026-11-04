@@ -22,10 +22,15 @@ jobs:
         with:
           node-version: "24"
           cache: npm
-          cache-dependency-path: client/package-lock.json
-
+          cache-dependency-path: |
+            client/package-lock.json
+            server/package-lock.json
       - name: Install frontend dependencies
         working-directory: client
+        run: npm ci
+
+      - name: Install backend dependencies
+        working-directory: server
         run: npm ci
 
       - name: Check frontend code
@@ -42,6 +47,10 @@ jobs:
 
       - name: Build and start containers
         run: docker compose up -d --build --wait --wait-timeout 180
+
+      - name: Test API authentication and publishing
+        working-directory: server
+        run: npm test
 
       - name: Check API through Nginx
         run: |
