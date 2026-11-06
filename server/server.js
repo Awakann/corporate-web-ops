@@ -6,6 +6,7 @@ const User = require("./models/User");
 const bcrypt = require("bcryptjs");
 const session = require("express-session");
 const { MongoStore } = require("connect-mongo");
+const path = require("node:path");
 
 const { rateLimit } = require("express-rate-limit");
 
@@ -352,8 +353,24 @@ app.patch("/api/admin/pages/:id", async (req, res) => {
 });
 
 
+    if (process.env.SERVE_CLIENT === "true") {
+    const clientDir = path.join(__dirname, "client-dist");
+
+    app.use("/api", (_req, res) => {
+        res.status(404).json({ error: "API route not found" });
+    });
+
+    app.use(express.static(clientDir));
+
+    app.get("/{*path}", (_req, res) => {
+        res.sendFile(path.join(clientDir, "index.html"));
+    });
+    }
+
+
 
 const PORT = Number(process.env.PORT) || 5000;
+
 
 async function startServer() {
     try {
