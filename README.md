@@ -151,6 +151,16 @@ az containerapp update --name ca-corporate-web-ops --resource-group rg-corporate
 
 This command requires the existing environment, registry access, identity, and application secrets. The YAML is an application update configuration, not a complete infrastructure provisioning template.
 
+
+## Infrastructure as Code
+
+The `infra/` directory contains four Azure Bicep templates covering the container registry, Container Apps environment, managed identities, GitHub OIDC trust, scoped role assignments, and Container App configuration.
+
+All four templates were compiled, previewed with Azure What-If, and applied to the existing environment. After deployment, the health endpoint responded successfully and the API returned existing published pages from MongoDB Atlas.
+
+GitHub Actions handles application releases. The Bicep templates capture the existing infrastructure; provisioning a fresh subscription from scratch has not been tested.
+
+
 ## Verification
 
 ### Automated CI Checks
@@ -162,6 +172,9 @@ GitHub Actions checks:
 - API health through Nginx.
 - Public API and website responses.
 - Origin validation for state-changing requests.
+- API integration tests using Node’s test runner, Supertest, and an isolated local MongoDB database.
+- Tests cover protected routes, origin validation, login/logout, role permissions, draft privacy, publishing, and duplicate slugs.
+- Deployment runs only after verification passes on main.
 
 ### Manual Azure Verification
 
@@ -173,7 +186,7 @@ Verified after deployment:
 - Logout.
 - API health and database reads.
 
-GitHub Actions automatically deploys commits on main after verification passes. Deployment uses Azure OIDC authentication, commit-tagged container images, revision-readiness checks, and deployed endpoint checks. Comprehensive API tests are planned.
+GitHub Actions automatically deploys commits on main after verification passes. Deployment uses Azure OIDC authentication, commit-tagged container images, revision-readiness checks, and deployed endpoint checks. Additional validation, rate-limit, and error-handling tests are planned.
 
 ## Troubleshooting Experience
 
@@ -227,5 +240,4 @@ For frontend development instructions, see [client/README.md](client/README.md).
 ## Planned Improvements
 
 - API tests for authentication, permissions, and publishing.
-- Infrastructure provisioning with Bicep or Terraform.
 - Monitoring, cost alerts, and a durable database network-access setup.
