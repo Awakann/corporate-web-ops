@@ -3,6 +3,7 @@ import './App.css'
 import DraftList from "./components/DraftList.jsx";
 import CreateDraftForm from './components/CreateDraftForm'
 import { Link } from 'react-router'
+import PublishedList from './components/PublishedList.jsx'
 
 function App() {
 
@@ -158,22 +159,30 @@ function App() {
         </header>
 
         <section>
-          <div className="workspace-grid">
-          {["admin", "editor"].includes(user.role) && (
-            <CreateDraftForm
-              onCreated={() => setDraftVersion((version) => version + 1)}
-            />
-          )}
+            <div className="workspace-grid">
+                {["admin", "editor"].includes(user.role) && (
+                    <CreateDraftForm
+                      onCreated={() => setDraftVersion((version) => version + 1)}
+                    />
+                  )}
 
-          <DraftList
-            refreshVersion={draftVersion}
-            userRole={user.role}
-          />
-        </div>
+                  <DraftList  
+                    refreshVersion={draftVersion}
+                    userRole={user.role}
+                    onPublished={() => setDraftVersion((version) => version + 1)}
+                  />
+
+                  {["admin", "reviewer"].includes(user.role) && (
+                    <PublishedList
+                      refreshVersion={draftVersion}
+                      onUnpublished={() => setDraftVersion((version) => version + 1)}
+                    />
+                  )}
+                </div>
         </section>
-      </main>
-    );
-  }
+              </main>
+            );
+          }
 
 
   return (

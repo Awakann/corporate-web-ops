@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import DraftEditor from "./DraftEditor";
 
-function DraftList({ refreshVersion, userRole }) {
+function DraftList({ refreshVersion, userRole, onPublished }) {
 
   const [pages, setPages] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -85,6 +85,7 @@ function DraftList({ refreshVersion, userRole }) {
     );
     setPublishTarget(null);
     setNotice(`"${page.title}" is now published.`);
+    onPublished();
   } catch (error) {
     setPublishError(error.message);
   } finally {
