@@ -9,8 +9,18 @@ Built to demonstrate web development, containerization, cloud deployment, and op
 - [Public website](https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io/site)
 - [Staff portal](https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io/)
 - [API health](https://ca-corporate-web-ops.lemonwater-0d1d9cfb.eastus.azurecontainerapps.io/api/health)
+- [Live Demo](https://corporate-web-ops.onrender.com/site)
+
+
+**[Live demo on Render](https://corporate-web-ops.onrender.com/site)**
+
+Corporate Web Ops is a React and Express CMS with role-based drafting,
+publishing, and unpublishing. The public demo runs on Render with Docker
+and MongoDB Atlas. The repository also includes a verified Azure Container
+Apps deployment using Bicep, GitHub Actions, and OIDC. The Azure deployment passed a test using temporary Atlas network access. Ongoing Azure access to Atlas is not configured.
 
 Staff access requires an account. No public admin credentials are provided.
+
 
 **Demo availability:** Atlas network access is currently temporary. When its access-list entry expires, database-backed features become unavailable. With scaling to zero enabled, the first request after inactivity may take longer.
 
