@@ -12,6 +12,23 @@ const { rateLimit } = require("express-rate-limit");
 
 const app = express();
 
+app.disable("x-powered-by");
+
+app.use((_req, res, next) => {
+  res.set({
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    "Referrer-Policy": "strict-origin-when-cross-origin",
+  });
+  next();
+});
+
+app.use("/api", (_req, res, next) => {
+  res.set("Cache-Control", "no-store");
+  next();
+});
+
+
 const proxyHops = Number(process.env.TRUST_PROXY_HOPS ?? "0");
 
 if (!Number.isInteger(proxyHops) || proxyHops < 0) {
@@ -275,40 +292,54 @@ app.post("/api/auth/logout", (req, res) => {
 
 
 
-app.patch("/api/admin/pages/:id/publish", async (req, res) => {
-  if (!req.session?.userId) {
-    return res.status(401).json({ error: "Login required" });
-  }
 
-  try {
-    const user = await User.findById(req.session.userId).select("role");
-    if (!user) {
+function changePublicationStatus(from, to, missingMessage) {
+  return async (req, res) => {
+    if (!req.session?.userId) {
       return res.status(401).json({ error: "Login required" });
     }
-    if (!["admin", "reviewer"].includes(user.role)) {
-      return res.status(403).json({ error: "Permission denied" });
+
+    try {
+      const user = await User.findById(req.session.userId).select("role");
+      if (!user) {
+        return res.status(401).json({ error: "Login required" });
+      }
+      if (!["admin", "reviewer"].includes(user.role)) {
+        return res.status(403).json({ error: "Permission denied" });
+      }
+      if (!mongoose.isObjectIdOrHexString(req.params.id)) {
+        return res.status(400).json({ error: "Invalid page ID" });
+      }
+
+      const page = await Page.findOneAndUpdate(
+        { _id: req.params.id, status: from },
+        { $set: { status: to } },
+        { returnDocument: "after", runValidators: true }
+      );
+
+      if (!page) {
+        return res.status(404).json({ error: missingMessage });
+      }
+
+      return res.json({ page });
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        error: "Could not change publication status",
+      });
     }
+  };
+}
 
-    if (!mongoose.isValidObjectId(req.params.id)) {
-      return res.status(400).json({ error: "Invalid page ID" });
-    }
+app.patch(
+  "/api/admin/pages/:id/publish",
+  changePublicationStatus("draft", "published", "Draft not found")
+);
 
-    const page = await Page.findOneAndUpdate(
-      { _id: req.params.id, status: "draft" },
-      { $set: { status: "published" } },
-      { returnDocument: "after" }
-    );
-
-    if (!page) {
-      return res.status(404).json({ error: "Draft not found" });
-    }
-
-    return res.json({ page });
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ error: "Could not publish page" });
-  }
-});
+app.patch(
+  "/api/admin/pages/:id/unpublish",
+  changePublicationStatus("published", "draft", "Published page not found")
+);
 
 
 
